@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for Plico",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
