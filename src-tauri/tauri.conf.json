@@ -22,7 +22,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg"],
+    "targets": "all",
     "icon": [
       "icons/icon.png"
     ]
