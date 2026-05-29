@@ -34,7 +34,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Install Rust stable
-        uses: dtolnay/rust-action/setup@v1
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
