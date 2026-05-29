@@ -1,76 +1,29 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { listen } from '@tauri-apps/api/event'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import hljs from 'highlight.js/lib/core'
-import hljsPython from 'highlight.js/lib/languages/python'
-import hljsC from 'highlight.js/lib/languages/c'
-import hljsCpp from 'highlight.js/lib/languages/cpp'
-import hljsJava from 'highlight.js/lib/languages/java'
-import hljsJavascript from 'highlight.js/lib/languages/javascript'
-import hljsCsharp from 'highlight.js/lib/languages/csharp'
-import hljsGo from 'highlight.js/lib/languages/go'
-import hljsSql from 'highlight.js/lib/languages/sql'
-import hljsTypescript from 'highlight.js/lib/languages/typescript'
-import hljsRust from 'highlight.js/lib/languages/rust'
-import hljsRuby from 'highlight.js/lib/languages/ruby'
-import hljsSwift from 'highlight.js/lib/languages/swift'
-import hljsKotlin from 'highlight.js/lib/languages/kotlin'
-import hljsPhp from 'highlight.js/lib/languages/php'
-import hljsPerl from 'highlight.js/lib/languages/perl'
-import hljsLua from 'highlight.js/lib/languages/lua'
-import hljsScala from 'highlight.js/lib/languages/scala'
-import hljsR from 'highlight.js/lib/languages/r'
-import hljsDart from 'highlight.js/lib/languages/dart'
-import hljsBash from 'highlight.js/lib/languages/bash'
-import hljsDos from 'highlight.js/lib/languages/dos'
-import hljsPowershell from 'highlight.js/lib/languages/powershell'
-import hljsJson from 'highlight.js/lib/languages/json'
-import hljsYaml from 'highlight.js/lib/languages/yaml'
-import hljsXml from 'highlight.js/lib/languages/xml'
-import hljsCss from 'highlight.js/lib/languages/css'
-import hljsMarkdown from 'highlight.js/lib/languages/markdown'
-import hljsPlaintext from 'highlight.js/lib/languages/plaintext'
-
-hljs.registerLanguage('python', hljsPython)
-hljs.registerLanguage('c', hljsC)
-hljs.registerLanguage('cpp', hljsCpp)
-hljs.registerLanguage('java', hljsJava)
-hljs.registerLanguage('javascript', hljsJavascript)
-hljs.registerLanguage('csharp', hljsCsharp)
-hljs.registerLanguage('go', hljsGo)
-hljs.registerLanguage('sql', hljsSql)
-hljs.registerLanguage('typescript', hljsTypescript)
-hljs.registerLanguage('rust', hljsRust)
-hljs.registerLanguage('ruby', hljsRuby)
-hljs.registerLanguage('swift', hljsSwift)
-hljs.registerLanguage('kotlin', hljsKotlin)
-hljs.registerLanguage('php', hljsPhp)
-hljs.registerLanguage('perl', hljsPerl)
-hljs.registerLanguage('lua', hljsLua)
-hljs.registerLanguage('scala', hljsScala)
-hljs.registerLanguage('r', hljsR)
-hljs.registerLanguage('dart', hljsDart)
-hljs.registerLanguage('bash', hljsBash)
-hljs.registerLanguage('shell', hljsBash)
-hljs.registerLanguage('sh', hljsBash)
-hljs.registerLanguage('cmd', hljsDos)
-hljs.registerLanguage('bat', hljsDos)
-hljs.registerLanguage('dos', hljsDos)
-hljs.registerLanguage('powershell', hljsPowershell)
-hljs.registerLanguage('ps1', hljsPowershell)
-hljs.registerLanguage('json', hljsJson)
-hljs.registerLanguage('yaml', hljsYaml)
-hljs.registerLanguage('yml', hljsYaml)
-hljs.registerLanguage('xml', hljsXml)
-hljs.registerLanguage('html', hljsXml)
-hljs.registerLanguage('css', hljsCss)
-hljs.registerLanguage('markdown', hljsMarkdown)
-hljs.registerLanguage('plaintext', hljsPlaintext)
+import hljs from 'highlight.js'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightActiveLine } from '@codemirror/view'
 import { history, defaultKeymap, historyKeymap } from '@codemirror/commands'
 import { markdown as cmMarkdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { javascript } from '@codemirror/lang-javascript'
+import { json } from '@codemirror/lang-json'
+import { python } from '@codemirror/lang-python'
+import { java } from '@codemirror/lang-java'
+import { cpp } from '@codemirror/lang-cpp'
+import { css } from '@codemirror/lang-css'
+import { html } from '@codemirror/lang-html'
+import { rust } from '@codemirror/lang-rust'
+import { sql } from '@codemirror/lang-sql'
+import { xml } from '@codemirror/lang-xml'
+import { go } from '@codemirror/lang-go'
+import { php } from '@codemirror/lang-php'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import {
   loadNotes,
   getActiveNote,
@@ -105,6 +58,61 @@ const baseTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
 })
 
+const highlightStyle = HighlightStyle.define([
+  { tag: tags.heading1, fontWeight: 'bold', fontSize: '1.4em', color: '#1a1a1a' },
+  { tag: tags.heading2, fontWeight: 'bold', fontSize: '1.2em', color: '#1a1a1a' },
+  { tag: tags.heading3, fontWeight: 'bold', fontSize: '1.1em', color: '#1a1a1a' },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+  { tag: tags.strong, fontWeight: 'bold' },
+  { tag: tags.link, color: '#1565c0', textDecoration: 'underline' },
+  { tag: tags.url, color: '#1565c0' },
+  { tag: tags.monospace, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)' },
+  { tag: tags.quote, color: '#a68a64', fontStyle: 'italic' },
+  { tag: tags.comment, color: '#a0a1a7', fontStyle: 'italic' },
+  { tag: tags.keyword, color: '#a626a4' },
+  { tag: tags.string, color: '#50a14f' },
+  { tag: tags.number, color: '#986801' },
+  { tag: tags.bool, color: '#986801' },
+  { tag: tags.null, color: '#986801' },
+  { tag: tags.propertyName, color: '#4078f2' },
+  { tag: tags.variableName, color: '#e45649' },
+  { tag: tags.typeName, color: '#c18401' },
+  { tag: tags.className, color: '#c18401' },
+  { tag: tags.operator, color: '#383a42' },
+  { tag: tags.punctuation, color: '#383a42' },
+  { tag: tags.bracket, color: '#383a42' },
+  { tag: tags.meta, color: '#4078f2' },
+  { tag: tags.processingInstruction, color: '#a68a64' },
+  { tag: tags.definition(tags.variableName), color: '#e45649' },
+  { tag: tags.function(tags.variableName), color: '#4078f2' },
+  { tag: tags.labelName, color: '#a626a4' },
+  { tag: tags.separator, color: '#a0a1a7' },
+  { tag: tags.strikethrough, textDecoration: 'line-through', color: '#a0a1a7' },
+  { tag: tags.inserted, color: '#50a14f' },
+  { tag: tags.deleted, color: '#e45649' },
+  { tag: tags.changed, color: '#986801' },
+])
+
+function getLangExtension(mode: string) {
+  switch (mode) {
+    case 'javascript': return javascript()
+    case 'typescript': return javascript({ typescript: true })
+    case 'json': return json()
+    case 'python': return python()
+    case 'java': return java()
+    case 'cpp': return cpp()
+    case 'css': return css()
+    case 'html': return html()
+    case 'rust': return rust()
+    case 'sql': return sql()
+    case 'xml': return xml()
+    case 'go': return go()
+    case 'php': return php()
+    case 'markdown': return cmMarkdown({ base: markdownLanguage })
+    default: return []
+  }
+}
+
 export default function Editor() {
   const [note, setNote] = useState<Note | null>(null)
   const [showDrawer, setShowDrawer] = useState(false)
@@ -115,7 +123,6 @@ export default function Editor() {
   const [showSettings, setShowSettings] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
-  const dragCountRef = useRef(0)
   const cmRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -134,6 +141,19 @@ export default function Editor() {
         setLineHeight(settings.lineHeight)
       } catch { /* settings load failed, use defaults */ }
 
+      // 优先检查通过命令行/macOS 打开的文件
+      try {
+        const opened = await invoke<{ path: string; content: string; mode: string } | null>('get_opened_file')
+        if (opened && opened.content) {
+          const newNote = await createNote(opened.content, opened.mode as EditMode)
+          setNote(newNote)
+          noteIdRef.current = newNote.id
+          setNotes(await loadNotes())
+          return
+        }
+      } catch { /* ignore */ }
+
+      // 没有打开的文件，加载上次的笔记
       try {
         const active = await getActiveNote()
         if (!active) return
@@ -143,7 +163,9 @@ export default function Editor() {
         setNotes(notesList)
       } catch { /* ignore */ }
     }
-    init()
+    init().finally(() => {
+      getCurrentWindow().show().catch(() => {})
+    })
 
     return () => {
       clearTimeout(saveTimerRef.current)
@@ -198,7 +220,9 @@ export default function Editor() {
         highlightActiveLine(),
         wrapExtension,
         history(),
-        cmMarkdown({ base: markdownLanguage }),
+        getLangExtension(note.mode),
+        syntaxHighlighting(highlightStyle),
+        EditorView.scrollMargins.of(() => ({ bottom: 72 })),
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
@@ -207,7 +231,7 @@ export default function Editor() {
         EditorView.updateListener.of((update) => {
           if (update.docChanged) handleChange(update.view)
         }),
-        EditorView.theme({ '&': { color: 'rgba(0,0,0,0.75)' } }),
+        EditorView.theme({ '.cm-content': { color: 'rgba(0,0,0,0.75)' } }),
       ],
     })
 
@@ -217,17 +241,6 @@ export default function Editor() {
     return () => { viewRef.current?.destroy(); viewRef.current = null }
   }, [note?.id, note?.mode, fontSize, lineHeight, wordWrap])
 
-  // 切换文稿时同步内容
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view || !note) return
-    const current = view.state.doc.toString()
-    if (current !== note.content) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: note.content } })
-    }
-    noteIdRef.current = note.id
-  }, [note])
-
   // Markdown 模式下编辑区和预览区同步滚动
   useEffect(() => {
     if (note?.mode !== 'markdown') return
@@ -236,23 +249,27 @@ export default function Editor() {
     if (!view || !preview) return
 
     const scroller = view.scrollDOM
+    const scrollSource = { current: null as 'editor' | 'preview' | null }
+    let timer = 0
 
     const syncToPreview = () => {
-      if (syncingScroll.current) return
-      syncingScroll.current = true
+      if (scrollSource.current === 'preview') return
+      scrollSource.current = 'editor'
       const max = scroller.scrollHeight - scroller.clientHeight
       const ratio = max > 0 ? scroller.scrollTop / max : 0
       preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight)
-      requestAnimationFrame(() => { syncingScroll.current = false })
+      clearTimeout(timer)
+      timer = window.setTimeout(() => { scrollSource.current = null }, 80)
     }
 
     const syncToEditor = () => {
-      if (syncingScroll.current) return
-      syncingScroll.current = true
+      if (scrollSource.current === 'editor') return
+      scrollSource.current = 'preview'
       const max = preview.scrollHeight - preview.clientHeight
       const ratio = max > 0 ? preview.scrollTop / max : 0
       scroller.scrollTop = ratio * (scroller.scrollHeight - scroller.clientHeight)
-      requestAnimationFrame(() => { syncingScroll.current = false })
+      clearTimeout(timer)
+      timer = window.setTimeout(() => { scrollSource.current = null }, 80)
     }
 
     scroller.addEventListener('scroll', syncToPreview)
@@ -260,6 +277,7 @@ export default function Editor() {
     return () => {
       scroller.removeEventListener('scroll', syncToPreview)
       preview.removeEventListener('scroll', syncToEditor)
+      clearTimeout(timer)
     }
   }, [note?.mode, note?.id, fontSize, lineHeight])
 
@@ -267,7 +285,12 @@ export default function Editor() {
     if (!note) return
     const content = viewRef.current?.state.doc.toString() ?? note.content
     try {
-      const ext = note.mode === 'markdown' ? '.md' : '.txt'
+      const modeExtMap: Record<string, string> = {
+        markdown: '.md', javascript: '.js', typescript: '.ts', json: '.json',
+        python: '.py', java: '.java', cpp: '.cpp', css: '.css', html: '.html',
+        rust: '.rs', sql: '.sql', xml: '.xml', go: '.go', php: '.php',
+      }
+      const ext = modeExtMap[note.mode] ?? '.txt'
       const outputPath = await invoke<string>('export_file', { content, ext })
       await invoke('show_in_folder', { path: outputPath })
     } catch { /* export failed */ }
@@ -386,40 +409,51 @@ export default function Editor() {
     document.addEventListener('mouseup', onEnd)
   }
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    if (!e.dataTransfer.types.includes('Files')) return
-    dragCountRef.current++
-    setDragOver(true)
-  }
+  // Tauri 拖拽事件
+  useEffect(() => {
+    const unlisten = getCurrentWebview().onDragDropEvent((e) => {
+      const event = e.payload
+      if (event.type === 'enter') {
+        setDragOver(true)
+      } else if (event.type === 'leave') {
+        setDragOver(false)
+      } else if (event.type === 'drop') {
+        setDragOver(false)
+        const paths = event.paths
+        if (!paths.length) return
+        (async () => {
+          for (const path of paths) {
+            try {
+              const content = await invoke<string>('read_file_as_text', { path })
+              if (!content) continue
+              const ext = path.split('.').pop()?.toLowerCase()
+              const mode: EditMode = ext === 'md' || ext === 'markdown' ? 'markdown' : 'text'
+              const newNote = await createNote(content, mode)
+              setNote(newNote)
+              noteIdRef.current = newNote.id
+              setNotes(await loadNotes())
+            } catch { /* ignore unreadable files */ }
+          }
+        })()
+      }
+    })
+    return () => { unlisten.then(f => f()) }
+  }, [])
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    const related = e.relatedTarget as Node | null
-    if (related && e.currentTarget.contains(related)) return
-    dragCountRef.current = 0
-    setDragOver(false)
-  }
-
-  const handleFileDrop = async (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    dragCountRef.current = 0
-    setDragOver(false)
-    const files = e.dataTransfer.files
-    if (!files.length) return
-    for (const file of files) {
+  // 监听 macOS Finder 打开文件事件
+  useEffect(() => {
+    const unlisten = listen<{ path: string; content: string; mode: string }>('file-opened', async (event) => {
+      const { content, mode } = event.payload
+      if (!content) return
       try {
-        const content = await file.text()
-        if (!content) continue
-        const ext = file.name.split('.').pop()?.toLowerCase()
-        const mode: EditMode = ext === 'md' || ext === 'markdown' ? 'markdown' : 'text'
-        const newNote = await createNote(content, mode)
+        const newNote = await createNote(content, mode as EditMode)
         setNote(newNote)
         noteIdRef.current = newNote.id
         setNotes(await loadNotes())
-      } catch { /* ignore unreadable files */ }
-    }
-  }
+      } catch { /* ignore */ }
+    })
+    return () => { unlisten.then(f => f()) }
+  }, [])
 
   const formatTime = (ts: number) => {
     const now = Date.now()
@@ -438,12 +472,7 @@ export default function Editor() {
     : ''
 
   return (
-    <div className="editor"
-      onDragEnter={handleDragEnter}
-      onDragOver={e => e.preventDefault()}
-      onDragLeave={handleDragLeave}
-      onDrop={handleFileDrop}
-    >
+    <div className="editor">
       <div className="editor-main">
         {note.mode === 'markdown' ? (
           <div className="editor-md-view">

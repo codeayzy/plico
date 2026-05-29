@@ -3,6 +3,7 @@
   "description": "Default permissions for Plico",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-show"
   ]
 }

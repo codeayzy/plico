@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +72,31 @@ fn get_title(content: &str) -> String {
 fn mode_to_ext(mode: &str) -> &str {
     match mode {
         "markdown" => ".md",
+        "javascript" => ".js",
+        "typescript" => ".ts",
+        "json" => ".json",
+        "python" => ".py",
+        "java" => ".java",
+        "cpp" => ".cpp",
+        "c" => ".c",
+        "css" => ".css",
+        "html" => ".html",
+        "rust" => ".rs",
+        "sql" => ".sql",
+        "xml" => ".xml",
+        "go" => ".go",
+        "php" => ".php",
+        "ruby" => ".rb",
+        "swift" => ".swift",
+        "kotlin" => ".kt",
+        "shell" => ".sh",
+        "yaml" => ".yaml",
+        "toml" => ".toml",
+        "lua" => ".lua",
+        "dart" => ".dart",
+        "r" => ".r",
+        "scala" => ".scala",
+        "perl" => ".pl",
         _ => ".txt",
     }
 }
@@ -78,9 +104,45 @@ fn mode_to_ext(mode: &str) -> &str {
 fn ext_to_mode(ext: &str) -> &str {
     match ext {
         "md" | "markdown" => "markdown",
+        "js" | "mjs" | "cjs" => "javascript",
+        "ts" | "tsx" => "typescript",
+        "jsx" => "javascript",
+        "json" | "jsonc" | "json5" => "json",
+        "py" | "pyw" => "python",
+        "java" => "java",
+        "cpp" | "hpp" | "cc" | "cxx" => "cpp",
+        "c" | "h" => "c",
+        "css" | "scss" | "less" | "sass" => "css",
+        "html" | "htm" => "html",
+        "rs" => "rust",
+        "sql" => "sql",
+        "xml" | "svg" => "xml",
+        "go" => "go",
+        "php" => "php",
+        "rb" | "rbw" => "ruby",
+        "swift" => "swift",
+        "kt" | "kts" => "kotlin",
+        "sh" | "bash" | "zsh" | "fish" => "shell",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        "lua" => "lua",
+        "dart" => "dart",
+        "r" => "r",
+        "scala" => "scala",
+        "pl" | "pm" => "perl",
         _ => "text",
     }
 }
+
+#[derive(Serialize)]
+struct OpenedFileInfo {
+    path: String,
+    content: String,
+    mode: String,
+}
+
+#[derive(Default)]
+struct OpenedFile(Mutex<Option<OpenedFileInfo>>);
 
 fn file_updated_at(path: &PathBuf) -> u64 {
     fs::metadata(path)
@@ -229,6 +291,17 @@ fn show_in_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn read_file_as_text(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file {}: {}", path, e))
+}
+
+#[tauri::command]
+fn get_opened_file(state: tauri::State<OpenedFile>) -> Result<Option<OpenedFileInfo>, String> {
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(guard.take())
+}
+
+#[tauri::command]
 fn load_settings(app: tauri::AppHandle) -> Result<Settings, String> {
     let data_dir = get_data_dir(&app)?;
     let path = settings_path(&data_dir);
@@ -254,6 +327,7 @@ fn save_settings_cmd(app: tauri::AppHandle, settings: Settings) -> Result<(), St
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(OpenedFile::default())
         .invoke_handler(tauri::generate_handler![
             list_notes,
             read_note,
@@ -263,9 +337,61 @@ pub fn run() {
             show_in_folder,
             load_settings,
             save_settings_cmd,
+            read_file_as_text,
+            get_opened_file,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .setup(|app| {
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                let path = &args[1];
+                if std::path::Path::new(path).is_file() {
+                    if let Ok(content) = fs::read_to_string(path) {
+                        let ext = path.rsplit('.').next().unwrap_or("");
+                        let mode = ext_to_mode(ext).to_string();
+                        let state = app.state::<OpenedFile>();
+                        *state.0.lock().unwrap() = Some(OpenedFileInfo {
+                            path: path.clone(),
+                            content,
+                            mode,
+                        });
+                    }
+                }
+            }
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        if path.is_file() {
+                            if let Ok(content) = fs::read_to_string(&path) {
+                                let path_str = path.to_string_lossy().to_string();
+                                let ext = path_str.rsplit('.').next().unwrap_or("");
+                                let mode = ext_to_mode(ext).to_string();
+                                // 存储到状态，供前端 get_opened_file 获取（冷启动时 emit 没人接收）
+                                {
+                                    let state = app_handle.state::<OpenedFile>();
+                                    *state.0.lock().unwrap() = Some(OpenedFileInfo {
+                                        path: path_str.clone(),
+                                        content: content.clone(),
+                                        mode: mode.clone(),
+                                    });
+                                }
+                                // 同时 emit，供热启动时前端监听器接收
+                                let _ = app_handle.emit("file-opened", serde_json::json!({
+                                    "path": path_str,
+                                    "content": content,
+                                    "mode": mode,
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
+        });
 }
 
 #[cfg(test)]
@@ -286,13 +412,21 @@ mod tests {
         assert_eq!(ext_to_mode("md"), "markdown");
         assert_eq!(ext_to_mode("markdown"), "markdown");
         assert_eq!(ext_to_mode("txt"), "text");
-        assert_eq!(ext_to_mode("json"), "text");
+        assert_eq!(ext_to_mode("json"), "json");
+        assert_eq!(ext_to_mode("py"), "python");
+        assert_eq!(ext_to_mode("js"), "javascript");
+        assert_eq!(ext_to_mode("ts"), "typescript");
+        assert_eq!(ext_to_mode("cpp"), "cpp");
+        assert_eq!(ext_to_mode("rs"), "rust");
     }
 
     #[test]
     fn test_mode_to_ext() {
         assert_eq!(mode_to_ext("markdown"), ".md");
         assert_eq!(mode_to_ext("text"), ".txt");
+        assert_eq!(mode_to_ext("json"), ".json");
+        assert_eq!(mode_to_ext("python"), ".py");
+        assert_eq!(mode_to_ext("javascript"), ".js");
     }
 
     #[test]

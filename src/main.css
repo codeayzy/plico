@@ -34,26 +34,26 @@ textarea {
 
 @media (prefers-color-scheme: light) {
   body {
-    background-color: #f4f4f4;
+    background-color: #e8e4df;
   }
   ::-webkit-scrollbar-track-piece {
-    background-color: #f4f4f4;
+    background-color: #e8e4df;
   }
   ::-webkit-scrollbar-thumb {
-    border-color: #f4f4f4;
+    border-color: #e8e4df;
   }
 }
 
 @media (prefers-color-scheme: dark) {
   &::-webkit-scrollbar-track-piece {
-    background-color: #303133;
+    background-color: #2a2725;
   }
   &::-webkit-scrollbar-thumb {
     background-color: #666;
-    border-color: #303133;
+    border-color: #2a2725;
   }
   body {
-    background-color: #303133;
+    background-color: #2a2725;
     color: #fff;
   }
 }

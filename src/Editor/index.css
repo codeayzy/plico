@@ -34,7 +34,6 @@
 .editor-cm-wrapper .cm-scroller {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   overflow: auto;
-  padding-bottom: 72px;
 }
 
 .editor-cm-wrapper .cm-content {
@@ -47,8 +46,18 @@
   border-right: 1px solid rgba(0, 0, 0, 0.04);
   color: rgba(0, 0, 0, 0.12);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  min-width: 40px;
-  padding-right: 2px;
+  min-width: 28px;
+  padding: 0 8px 0 4px;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.editor-cm-wrapper .cm-gutters::-webkit-scrollbar,
+.editor-cm-wrapper .cm-gutter::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .editor-cm-wrapper .cm-activeLineGutter {

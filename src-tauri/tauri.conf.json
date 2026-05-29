@@ -13,7 +13,9 @@
       {
         "title": "Plico / 轻笔",
         "width": 900,
-        "height": 640
+        "height": 640,
+        "visible": false,
+        "backgroundColor": "#e8e4df"
       }
     ],
     "security": {
@@ -23,6 +25,68 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["txt", "md", "markdown", "json", "jsonc", "toml", "yaml", "yml", "xml", "csv", "log", "ini", "cfg", "conf", "env"],
+        "name": "Text Document",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": ["js", "ts", "tsx", "jsx", "mjs", "cjs"],
+        "name": "JavaScript/TypeScript",
+        "role": "Editor",
+        "mimeType": "text/javascript"
+      },
+      {
+        "ext": ["py", "pyw"],
+        "name": "Python",
+        "role": "Editor",
+        "mimeType": "text/x-python"
+      },
+      {
+        "ext": ["c", "h", "cpp", "hpp", "cc", "cxx"],
+        "name": "C/C++",
+        "role": "Editor",
+        "mimeType": "text/x-c"
+      },
+      {
+        "ext": ["java", "kt", "kts", "scala", "groovy"],
+        "name": "JVM Language",
+        "role": "Editor",
+        "mimeType": "text/x-java"
+      },
+      {
+        "ext": ["rs", "go", "swift", "dart", "rb", "rbw", "lua", "r"],
+        "name": "Source Code",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      },
+      {
+        "ext": ["html", "htm", "css", "scss", "less", "sass", "svg"],
+        "name": "Web File",
+        "role": "Editor",
+        "mimeType": "text/html"
+      },
+      {
+        "ext": ["sh", "bash", "zsh", "fish", "ps1", "bat", "cmd"],
+        "name": "Shell Script",
+        "role": "Editor",
+        "mimeType": "text/x-shellscript"
+      },
+      {
+        "ext": ["sql"],
+        "name": "SQL",
+        "role": "Editor",
+        "mimeType": "text/x-sql"
+      },
+      {
+        "ext": ["php", "pl", "pm", "vue", "svelte"],
+        "name": "Script File",
+        "role": "Editor",
+        "mimeType": "text/plain"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
